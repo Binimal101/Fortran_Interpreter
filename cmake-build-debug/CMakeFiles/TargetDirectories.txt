@@ -1,0 +1,3 @@
+C:/Users/Matthew Tujague/CLionProjects/PA3/cmake-build-debug/CMakeFiles/PA3.dir
+C:/Users/Matthew Tujague/CLionProjects/PA3/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/Matthew Tujague/CLionProjects/PA3/cmake-build-debug/CMakeFiles/rebuild_cache.dir

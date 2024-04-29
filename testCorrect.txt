@@ -1,4 +1,6 @@
-H W 5.00
-(DONE)
+5: Run-Time Error-Illegal division by Zero
+5: Missing Expression in Assignment Statement
+5: Incorrect Statement in program
 
-Successful Execution
+Unsuccessful Interpretation
+Number of Errors 3

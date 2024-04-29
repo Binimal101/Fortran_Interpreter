@@ -12,7 +12,7 @@
 #include "parserInterp.h"
 #include "val.h"
 #include "lex.cpp"
-#include "eval.cpp"
+#include "eval.h"
 
 using namespace std;
 
@@ -24,6 +24,8 @@ queue<Value>* valQue;
 
 stack<Value> operands;
 stack<string> operators;
+
+bool ifPermitted = true;
 
 namespace Parser {
 	bool pushed_back = false;
@@ -243,7 +245,6 @@ bool Decl(istream& in, int& line) {
 								status = VarList(in, line, type, stoi(strLen));
 								
 								if (status) {
-									cout << "Definition of Strings with length of " << strLen << " in declaration statement." << endl;
 									status = Decl(in, line);
 									if(!status)
 									{
@@ -351,8 +352,7 @@ bool SimpleStmt(istream& in, int& line) {
 			ParseError(line, "Incorrect Assignent Statement");
 			return false;
 		}
-		cout << "Assignment statement in a Simple If statement." << endl;
-			
+
 		break;
 		
 	
@@ -366,25 +366,30 @@ bool SimpleStmt(istream& in, int& line) {
 
 //VarList ::= Var [= Expr] {, Var [= Expr]}
 bool VarList(istream& in, int& line, LexItem& idtok, int strLen) { //idtok is varType
-	bool status = false, exprstatus = false;
+    resetStacks(operands, operators);
+
+    bool status = false, exprstatus = false;
 	string identstr;
 
 	LexItem tok = Parser::GetNextToken(in, line);
 	if(tok == IDENT) {
-		
-		identstr = tok.GetLexeme();
-		if (!(defVar.find(identstr)->second)) {  //variable doesn't exist in map?
-            SymTable[identstr] = idtok.GetToken();
-			defVar[identstr] = true;
 
-            if(idtok == CHARACTER) { //initialized as blanks for strLen referencing cross-scope
-                AssignTable[identstr] = string(strLen, ' ');
+        if(ifPermitted){
+            identstr = tok.GetLexeme();
+            if (!(defVar.find(identstr)->second)) {  //variable doesn't exist in map?
+                SymTable[identstr] = idtok.GetToken();
+                defVar[identstr] = true;
+
+                if (idtok == CHARACTER) { //initialized as blanks for strLen referencing cross-scope
+                    AssignTable[identstr] = string(strLen, ' ');
+                }
+
+            } else {
+                ParseError(line, "Variable Redefinition");
+                return false;
             }
 
-		} else {
-			ParseError(line, "Variable Redefinition");
-			return false;
-		}
+        }
 		
 	} else {
 		ParseError(line, "Missing Variable Name");
@@ -394,9 +399,6 @@ bool VarList(istream& in, int& line, LexItem& idtok, int strLen) { //idtok is va
 	tok = Parser::GetNextToken(in, line);
 	if(tok == ASSOP) {
 
-        //reset stacks
-        resetStacks(operands, operators);
-
         Value returned;
 		exprstatus = Expr(in, line, returned);
 
@@ -405,22 +407,23 @@ bool VarList(istream& in, int& line, LexItem& idtok, int strLen) { //idtok is va
 			return false;
 		}
 
-        bool vstatus = assignToVariable(identstr, idtok.GetToken(), returned, line);
-		if(!vstatus)
-            return false;
+        if(ifPermitted) {
+            bool vstatus = assignToVariable(identstr, idtok.GetToken(), returned, line);
+            if (!vstatus)
+                return false;
+        }
 
-		cout<< "Initialization of the variable " << identstr <<" in the declaration statement." << endl;
 		tok = Parser::GetNextToken(in, line);
 		
 		if (tok == COMMA) {
-            status = VarList(in, line, idtok);
+            status = VarList(in, line, idtok, strLen);
         } else {
 			Parser::PushBackToken(tok);
 			return true;
 		}
 	}
 	else if (tok == COMMA) {
-		status = VarList(in, line, idtok);
+		status = VarList(in, line, idtok, strLen);
 	} else if(tok == ERR) {
 		ParseError(line, "Unrecognized Input Pattern");
 		return false;
@@ -462,23 +465,23 @@ bool PrintStmt(istream& in, int& line) {
         return false;
     }
 
-    Parser::clearQueue();
-
-    cout << endl;
+    if(ifPermitted) {
+        Parser::clearQueue();
+        cout << endl;
+    }
     return ex;
 }//End of PrintStmt
 
 //BlockIfStmt:= if (Expr) then {Stmt} [Else Stmt]
 //SimpleIfStatement := if (Expr) Stmt
 bool BlockIfStmt(istream& in, int& line) {
-	bool ex=false, status;
-	static int nestlevel = 0;
-	int level;
+    bool ex=false, status;
+//    static int nestlevel = 0;
+//    int level;
 	LexItem t;
 	
 	t = Parser::GetNextToken(in, line);
 	if( t != LPAREN ) {
-		
 		ParseError(line, "Missing Left Parenthesis");
 		return false;
 	}
@@ -490,10 +493,13 @@ bool BlockIfStmt(istream& in, int& line) {
 		ParseError(line, "Missing if statement condition");
 		return false;
 	}
+
+    if(returned.IsBool() && !returned.GetBool()) {
+        ifPermitted = false; //shuts down logged activity of stmt's and decls
+    }
 	
 	t = Parser::GetNextToken(in, line);
 	if(t != RPAREN ) {
-		
 		ParseError(line, "Missing Right Parenthesis");
 		return false;
 	}
@@ -515,9 +521,8 @@ bool BlockIfStmt(istream& in, int& line) {
 		}
 		
 	}
-
-    nestlevel++;
-	level = nestlevel;
+//    nestlevel++;
+//    level = nestlevel;
 	status = Stmt(in, line);
 
 	if(!status)
@@ -525,8 +530,12 @@ bool BlockIfStmt(istream& in, int& line) {
 		ParseError(line, "Missing Statement for If-Stmt Then-Part");
 		return false;
 	}
+
 	t = Parser::GetNextToken(in, line);
 	if( t == ELSE ) {
+        //stmt & decl should not run in else if the original statement was true
+        ifPermitted = !ifPermitted;
+
 		status = Stmt(in, line);
 		if(!status)
 		{
@@ -539,13 +548,12 @@ bool BlockIfStmt(istream& in, int& line) {
 	}
 
 	if(t != END ) {
-		
 		ParseError(line, "Missing END of IF");
 		return false;
 	}
 	t = Parser::GetNextToken(in, line);
 	if(t == IF ) {
-		cout << "End of Block If statement at nesting level " << level << endl;
+        ifPermitted = true; //continue operation as normal
 		return true;
 	}	
 	
@@ -603,14 +611,16 @@ bool AssignStmt(istream& in, int& line) {
 			status = Expr(in, line, returned);
 
 			if(!status) {
-				ParseError(line, "Missing Expression in Assignment Statment");
+				ParseError(line, "Missing Expression in Assignment Statement");
 				return false;
 			}
-
-            varstatus = assignToVariable(variable.GetLexeme(),variable.GetToken(), returned, line);
-            if(!varstatus)
-                return false;
-
+            if(ifPermitted) {
+                varstatus = assignToVariable(variable.GetLexeme(), variable.GetToken(), returned, line);
+                if (!varstatus) {
+                    ParseError(line, "Missing Expression in Assignment Statement");
+                    return false;
+                }
+            }
 		}
 
 		else if(t.GetToken() == ERR){
@@ -633,6 +643,8 @@ bool AssignStmt(istream& in, int& line) {
 
 //ExprList:= Expr {,Expr}
 bool ExprList(istream& in, int& line) {
+    resetStacks(operands, operators);
+
     bool status = false;
 
     Value returned;
@@ -642,13 +654,12 @@ bool ExprList(istream& in, int& line) {
         ParseError(line, "Missing Expression");
         return false;
     }
-
-    valQue->push(returned);
+    if(ifPermitted)
+        valQue->push(returned);
     LexItem tok = Parser::GetNextToken(in, line);
 
     if (tok == COMMA) {
         status = ExprList(in, line);
-
     }
 
     else if(tok.GetToken() == ERR){
@@ -689,7 +700,10 @@ bool RelExpr(istream& in, int& line, Value& retVal) {
 			ParseError(line, "Missing operand after operator");
 			return false;
 		}
-		
+
+        evaluateStackRemains(operands, operators);
+        if(!operands.empty())
+            retVal = operands.top(); // might not need, will see l8r
 	}
 	
 	return true;
@@ -732,7 +746,7 @@ bool Expr(istream& in, int& line, Value& retVal) {
 	Parser::PushBackToken(tok);
     evaluateStackRemains(operands, operators);
     if(!operands.empty())
-        retVal = operands.top(); // might not need, will see l8r
+        retVal = operands.top();
 	return true;
 }
 
@@ -841,11 +855,20 @@ bool Factor(istream& in, int& line, int sign, Value& retVal) {
 		if (!(defVar.find(lexeme)->second)) {
 			ParseError(line, "Using Undefined Variable");
 			return false;	
-		} else if(AssignTable.find(lexeme) == AssignTable.end()) { //iterated wto finding
+		} else if(AssignTable.find(lexeme) == AssignTable.end() && ifPermitted) { //iterated wto finding
             ParseError(line, "Using Unassigned Variable (" + lexeme + ")");
             return false;
         }
         lexValue = AssignTable[lexeme];
+
+        //need to figure a way to throw errors neatly when lexValue is of bad typing
+        if(lexValue.IsReal() || lexValue.IsInt() || signage == "-") {
+            lexValue = lexValue * atoi((signage + "1").c_str()); //accounts for sign
+        }
+        if(lexValue.IsErr()) {
+            ParseError(line, "Illegal Operand Type for Sign Operator");
+            return false;
+        }
         addOperandAndEvaluateStacks(operands, operators, lexValue);
         return true;
 	}

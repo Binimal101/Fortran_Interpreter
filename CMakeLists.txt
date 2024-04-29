@@ -6,4 +6,5 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(PA3 main.cpp
         parserInterp.h
         lex.h
-        val.h)
+        val.h
+        eval.h)

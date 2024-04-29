@@ -29,7 +29,7 @@ public:
     Value(bool vb) : T(VBOOL), Btemp(vb), Itemp(0), Rtemp(0.0), Stemp(""), strLen(0) {}
     Value(int vi) : T(VINT), Btemp(false), Itemp(vi), Rtemp(0.0), Stemp(""), strLen(0) {}
     Value(double vr) : T(VREAL), Btemp(false), Itemp(0), Rtemp(vr), Stemp(""), strLen(0) {}
-    Value(string vs) : T(VSTRING), Btemp(false), Itemp(0), Rtemp(0.0), Stemp(vs), strLen(1) { }
+    Value(string vs) : T(VSTRING), Btemp(false), Itemp(0), Rtemp(0.0), Stemp(vs), strLen(vs.length()) { }
 
     ValType GetType() const { return T; }
     bool IsErr() const { return T == VERR; }
@@ -141,12 +141,15 @@ public:
     }
 
     Value operator==(const Value& op) const {
-        if(GetType() == op.GetType()) {
+        Value temp;
+        if(GetType() == op.GetType() || (( IsInt() || IsReal() ) && ( op.IsReal() || op.IsInt() ))) {
             switch(GetType()) {
                 case VINT:
-                    return Value(GetInt() == op.GetInt());
+                    return ( (IsInt() || IsReal()) && (op.IsInt() || op.IsReal()) ) ?
+                          Value( (IsReal() ? GetReal() : GetInt()) == (op.IsReal() ? op.GetReal() : op.GetInt()) ) : Value();
                 case VREAL:
-                    return Value(GetReal() == op.GetReal());
+                    return ( (IsInt() || IsReal()) && (op.IsInt() || op.IsReal()) ) ?
+                           Value( (IsReal() ? GetReal() : GetInt()) == (op.IsReal() ? op.GetReal() : op.GetInt()) ) : Value();
                 case VSTRING:
                     return Value((GetString() == op.GetString()) && (GetstrLen() == op.GetstrLen()));
                 case VBOOL:
@@ -180,9 +183,5 @@ public:
         return out;
     }
 };
-
-bool operator==(Value v, ValType v2) {
-    return v.GetType() == v2;
-}
 
 #endif

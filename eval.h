@@ -1,3 +1,6 @@
+#ifndef EVAL_H_PA3
+#define EVAL_H_PA3
+
 #include <iostream>
 #include <stack>
 #include "val.h"
@@ -32,6 +35,11 @@ Value reduce(Value operand1, Value operand2, string op) {
     } if(op == "*") {
         return operand1 * operand2;
     } if(op == "/") {
+        if((operand2.IsInt() && operand2.GetInt() == 0) || (operand2.IsReal() && operand2.GetReal() == 0)) {
+            Value v = Value();
+            v.SetString("INF");
+            return v;
+        }
         return operand1 / operand2;
     } if(op == "**") {
         return operand1.Power(operand2);
@@ -134,3 +142,5 @@ void resetStacks(stack<Value>& operands, stack<string>& operators) {
         operators.pop();
     }
 }
+
+#endif

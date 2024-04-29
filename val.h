@@ -87,6 +87,7 @@ public:
 
     void SetString(string val) {
         Stemp = val;
+        SetstrLen(Stemp.length());
     }
 
     void SetBool(bool val) {
